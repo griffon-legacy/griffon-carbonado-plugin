@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 the original author or authors.
+ * Copyright 2011-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 package griffon.plugins.carbonado
+
+import griffon.core.GriffonApplication
+import griffon.util.Environment
+import griffon.util.Metadata
+import griffon.util.CallableWithArgs
+
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import groovy.sql.Sql
 import java.sql.Connection
@@ -32,105 +40,192 @@ import com.amazon.carbonado.repo.jdbc.JDBCConnectionCapability
 import com.amazon.carbonado.repo.map.MapRepositoryBuilder
 import com.amazon.carbonado.repo.sleepycat.BDBRepositoryBuilder
 
-import griffon.core.GriffonApplication
-import griffon.util.Environment
-import griffon.util.CallableWithArgs
-
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-
 /**
  * @author Andres Almiray
  */
 @Singleton
-final class CarbonadoConnector {
-    private static final Logger LOG = LoggerFactory.getLogger(CarbonadoConnector)
-    private final Object[] lock = new Object[0]
-    private boolean connected = false
+final class CarbonadoConnector implements CarbonadoProvider {
     private bootstrap
-    private GriffonApplication app
-    private DataSource dataSource
 
-    static void enhance(MetaClass mc) {
-        mc.withCarbonado = {Closure closure ->
-            RepositoryHolder.instance.withCarbonado(closure)
-        }
-        mc.withCarbonado << {CallableWithArgs callable ->
-            RepositoryHolder.instance.withCarbonado(callable)
-        }
+    private static final Logger LOG = LoggerFactory.getLogger(CarbonadoConnector)
+
+    Object withCarbonado(String repositoryName = 'default', Closure closure) {
+        RepositoryHolder.instance.withCarbonado(repositoryName, closure)
     }
 
-    Object withCarbonado(Closure closure) {
-        return RepositoryHolder.instance.withCarbonado(closure)
+    public <T> T withCarbonado(String repositoryName = 'default', CallableWithArgs<T> callable) {
+        return RepositoryHolder.instance.withCarbonado(repositoryName, callable)
     }
 
-    public <T> T withCarbonado(CallableWithArgs<T> callable) {
-        return RepositoryHolder.instance.withCarbonado(callable)
-    }
-    
     // ======================================================
 
     ConfigObject createConfig(GriffonApplication app) {
-        def carbonadoClass = app.class.classLoader.loadClass('CarbonadoConfig')
-        return new ConfigSlurper(Environment.current.name).parse(carbonadoClass)
+        def repositoryClass = app.class.classLoader.loadClass('CarbonadoConfig')
+        new ConfigSlurper(Environment.current.name).parse(repositoryClass)
     }
 
-    void connect(GriffonApplication app, ConfigObject config) {
-        synchronized(lock) {
-            if(connected) return
-            connected = true
+    private ConfigObject narrowConfig(ConfigObject config, String repositoryName) {
+        return repositoryName == 'default' ? config.repository : config.repositories[repositoryName]
+    }
+
+    Repository connect(GriffonApplication app, ConfigObject config, String repositoryName = 'default') {
+        if (RepositoryHolder.instance.isRepositoryConnected(repositoryName)) {
+            return RepositoryHolder.instance.getRepository(repositoryName)
         }
 
-        this.app = app
-        
-        app.event('CarbonadoConnectStart', [config])
-        switch(app.config.carbonado.repository) {
-            case 'jdbc':
-                createJDBCRepository(app, config)
-                break
-            case 'bdb':
-                createBDBRepository(app, config)
-                break
-            case 'map':
-            default:
-                createMapRepository(app, config)
-        }
-        
+        config = narrowConfig(config, repositoryName)
+        app.event('CarbonadoConnectStart', [config, repositoryName])
+        Repository repository = startCarbonado(config, repositoryName)
+        RepositoryHolder.instance.setRepository(repositoryName, repository)
         bootstrap = app.class.classLoader.loadClass('BootstrapCarbonado').newInstance()
         bootstrap.metaClass.app = app
-        RepositoryHolder.instance.withCarbonado { repository -> bootstrap.init(repository) }
-
-        app.event('CarbonadoConnectEnd', [RepositoryHolder.instance.repository])
+        bootstrap.init(repositoryName, repository)
+        app.event('CarbonadoConnectEnd', [repositoryName, repository])
+        repository
     }
 
-    void disconnect(GriffonApplication app, ConfigObject config) {
-        synchronized(lock) {
-            if(!connected) return
-            connected = false
+    void disconnect(GriffonApplication app, ConfigObject config, String repositoryName = 'default') {
+        if (RepositoryHolder.instance.isRepositoryConnected(repositoryName)) {
+            config = narrowConfig(config, repositoryName)
+            Repository repository = RepositoryHolder.instance.getRepository(repositoryName)
+            app.event('CarbonadoDisconnectStart', [config, repositoryName, repository])
+            bootstrap.destroy(repositoryName, repository)
+            stopCarbonado(config, repositoryName, repository)
+            app.event('CarbonadoDisconnectEnd', [config, repositoryName])
+            RepositoryHolder.instance.disconnectRepository(repositoryName)
         }
+    }
 
-        app.event('CarbonadoDisconnectStart', [config, RepositoryHolder.instance.repository])
-        bootstrap.destroy(RepositoryHolder.instance.repository)       
-        switch(app.config.carbonado.repository) {
+    private Repository startCarbonado(ConfigObject config, String repositoryName) {
+        switch(config.type) {
             case 'jdbc':
-                disconnectJDBCRepository(app, config)
+                return createJDBCRepository(config.jdbc, repositoryName)
+            case 'bdb':
+                return createBDBRepository(config.bdb, repositoryName)
+        }
+        return createMapRepository(config.map, repositoryName)
+    }
+
+    private Repository createJDBCRepository(ConfigObject config, String repositoryName) {   
+        DataSource dataSource = createDataSource(config)
+        def skipSchema = config.schema?.skip ?: false
+        if (!skipSchema) createSchema(config, repositoryName, dataSource)
+        
+        JDBCRepositoryBuilder builder = new JDBCRepositoryBuilder()
+        builder.name = repositoryName
+        builder.dataSource = dataSource
+        builder.build()
+    }
+
+    private Repository createBDBRepository(ConfigObject config, String repositoryName) {   
+        BDBRepositoryBuilder builder = new BDBRepositoryBuilder()
+        builder.name = repositoryName
+        config.each { propName, propValue ->
+            builder[propName] = propValue
+        }
+        builder.build()
+    }
+
+    private Repository createMapRepository(ConfigObject config, String repositoryName) {   
+        MapRepositoryBuilder builder = new MapRepositoryBuilder()
+        builder.name = repositoryName
+        config.each { propName, propValue ->
+            builder[propName] = propValue
+        }
+        builder.build()
+    }
+
+    private void stopCarbonado(ConfigObject config, String repositoryName, Repository repository) {
+        switch(config.type) {
+            case 'jdbc':
+                disconnectJDBCRepository(config.jdbc, repositoryName, repository)
                 break
             /*    
             case 'bdb':
-                disconnectBDBRepository(app, config)
+                disconnectBDBRepository(config, repositoryName, repository)
                 break
             case 'map':
             default:
-                disconnectMapRepository(app, config)
+                disconnectMapRepository(config, repositoryName, repository)
             */
         }
-        app.event('CarbonadoDisconnectEnd')
     }
-    
-    private void disconnectJDBCRepository(GriffonApplication app, ConfigObject config) {
+
+    private DataSource createDataSource(ConfigObject config) {
+        Class.forName(config.driverClassName.toString())
+        ObjectPool connectionPool = new GenericObjectPool(null)
+        if (config.pool) {
+            if (config.pool.maxWait != null) connectionPool.maxWait = config.pool.maxWait
+            if (config.pool.maxIdle != null) connectionPool.maxIdle = config.pool.maxIdle
+            if (config.pool.maxActive != null) connectionPool.maxActive = config.pool.maxActive
+        }
+
+        String url = config.url.toString()
+        String username = config.username.toString()
+        String password = config.password.toString()
+        ConnectionFactory connectionFactory = null
+        if (username) {
+            connectionFactory = new DriverManagerConnectionFactory(url, username, password)
+        } else {
+            connectionFactory = new DriverManagerConnectionFactory(url, null)
+        }
+        PoolableConnectionFactory poolableConnectionFactory = new PoolableConnectionFactory(connectionFactory, connectionPool, null, null, false, true)
+        new PoolingDataSource(connectionPool)
+    }
+
+    private void createSchema(ConfigObject config, String repositoryName, DataSource dataSource) {
+        String dbCreate = config.dbCreate.toString()
+        if (dbCreate != 'create') return
+
+        String env = getEnvironmentShortName()
+        URL ddl = null
+        for(String schemaName : [repositoryName + '-schema-'+ env +'.ddl', repositoryName + '-schema.ddl', 'schema-'+ env +'.ddl', 'schema.ddl']) {
+            ddl = getClass().classLoader.getResource(schemaName)
+            if (!ddl) {
+                LOG.warn("DataSource[${repositoryName}].dbCreate was set to 'create' but ${schemaName} was not found in classpath.")
+            } else {
+                break
+            }
+        }
+        if(!ddl) {
+            LOG.error("DataSource[${repositoryName}].dbCreate was set to 'create' but no suitable schema was found in classpath.")
+            return
+        }
+
+        boolean tokenizeddl = config.tokenizeddl ?: false
+        withSql(dataSource) { sql ->
+            if (!tokenizeddl) {
+                sql.execute(ddl.text)
+            } else {
+                ddl.text.split(';').each { stmnt ->
+                    if (stmnt?.trim()) sql.execute(stmnt + ';')
+                }
+            }
+        }
+    }
+
+    private String getEnvironmentShortName() {
+        switch(Environment.current) {
+            case Environment.DEVELOPMENT: return 'dev'
+            case Environment.TEST: return 'test'
+            case Environment.PRODUCTION: return 'prod'
+            default: return Environment.current.name
+        }
+    }
+
+    private void withSql(DataSource dataSource, Closure closure) {
+        Connection connection = dataSource.getConnection()
+        try {
+            closure(new Sql(connection))
+        } finally {
+            connection.close()
+        }
+    }
+
+    private void disconnectJDBCRepository(ConfigObject config, String repositoryName, Repository repository) {
         Connection connection = null
         try {
-            connection = dataSource.getConnection()
+            connection = repository.dataSource.getConnection()
             if(connection.metaData.databaseProductName == 'HSQL Database Engine') {
                 connection.createStatement().executeUpdate('SHUTDOWN')
             }
@@ -138,92 +233,4 @@ final class CarbonadoConnector {
             connection?.close()
         }
     }
-
-    /*
-    private void disconnectBDBRepository(GriffonApplication app, ConfigObject config) { }
-
-    private void disconnectMapRepository(GriffonApplication app, ConfigObject config) { }
-    */
-    
-    private void createJDBCRepository(GriffonApplication app, ConfigObject config) {   
-        dataSource = createDataSource(config)
-        def skipSchema = app.config.carbonado?.schema?.skip ?: false
-        if(!skipSchema) createSchema(config)
-        
-        JDBCRepositoryBuilder builder = new JDBCRepositoryBuilder()
-        builder.name = config.dataSource.name
-        builder.dataSource = dataSource
-        RepositoryHolder.instance.repository = builder.build()
-    }
-
-    private void createBDBRepository(GriffonApplication app, ConfigObject config) {   
-        BDBRepositoryBuilder builder = new BDBRepositoryBuilder()
-        config.berkeleydb.each { propName, propValue ->
-            builder[propName] = propValue
-        }
-        RepositoryHolder.instance.repository = builder.build()
-    }
-
-    private void createMapRepository(GriffonApplication app, ConfigObject config) {   
-        MapRepositoryBuilder builder = new MapRepositoryBuilder()
-        config.map.each { propName, propValue ->
-            builder[propName] = propValue
-        }
-        RepositoryHolder.instance.repository = builder.build()
-    }
-
-    private DataSource createDataSource(ConfigObject config) {
-        if(dataSource) return
-        
-        Class.forName(config.dataSource.driverClassName.toString())
-        ObjectPool connectionPool = new GenericObjectPool(null)
-        if(config.dataSource.pooled) {
-            if(config?.pool?.maxWait   != null) connectionPool.maxWait = config.pool.maxWait
-            if(config?.pool?.maxIdle   != null) connectionPool.maxIdle = config.pool.maxIdle
-            if(config?.pool?.maxActive != null) connectionPool.maxActive = config.pool.maxActive
-        }
- 
-        String url = config.dataSource.url.toString()
-        String username = config.dataSource.username.toString()
-        String password = config.dataSource.password.toString()
-        ConnectionFactory connectionFactory = null
-        if(username) {
-            connectionFactory = new DriverManagerConnectionFactory(url, username, password)
-        } else {
-            connectionFactory = new DriverManagerConnectionFactory(url, null)
-        }
-        PoolableConnectionFactory poolableConnectionFactory = new PoolableConnectionFactory(connectionFactory,connectionPool,null,null,false,true)
-        return new PoolingDataSource(connectionPool)
-    }
-
-    private void createSchema(ConfigObject config) {
-        def dbCreate = config.dataSource?.dbCreate.toString()
-        if(dbCreate != 'create') return
- 
-        URL ddl = getClass().classLoader.getResource('schema.ddl')
-        if(!ddl) {
-            LOG.warn("DataSource.dbCreate was set to 'create' but schema.ddl was not found in classpath.") 
-            return
-        }
- 
-        boolean tokenizeddl = config.dataSource?.tokenizeddl ?: false
-        withSql { sql -> 
-            if(!tokenizeddl) {
-                sql.execute(ddl.text)
-            } else {
-                ddl.text.split(';').each { stmnt ->
-                    if(stmnt?.trim()) sql.execute(stmnt + ';')
-                }
-            }
-        }
-    }
-
-    private withSql = { Closure closure ->
-        Connection connection = dataSource.getConnection()
-        try {
-            closure(new Sql(connection))
-        } finally {
-            connection.close()
-        }
-    } 
 }

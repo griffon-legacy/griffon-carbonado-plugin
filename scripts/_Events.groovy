@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 the original author or authors.
+ * Copyright 2011-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,6 @@
 /**
  * @author Andres Almiray
  */
-
-def eventClosure1 = binding.variables.containsKey('eventSetClasspath') ? eventSetClasspath : {cl->}
-eventSetClasspath = { cl ->
-    eventClosure1(cl)
-    if(compilingPlugin('carbonado')) return
-    griffonSettings.dependencyManager.flatDirResolver name: 'griffon-carbonado-plugin', dirs: "${carbonadoPluginDir}/addon"
-    griffonSettings.dependencyManager.addPluginDependency('carbonado', [
-        conf: 'compile',
-        name: 'griffon-carbonado-addon',
-        group: 'org.codehaus.griffon.plugins',
-        version: carbonadoPluginVersion
-    ])
-}
 
 eventCopyLibsEnd = { jardir ->
     def config = new ConfigSlurper().parse(Config)

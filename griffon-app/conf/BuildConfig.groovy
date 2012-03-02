@@ -2,23 +2,23 @@ griffon.project.dependency.resolution = {
     inherits "global"  
     log "warn"
     repositories {
-        griffonPlugins()
         griffonHome()
-        griffonCentral()
         mavenCentral()
-        flatDir name: 'carbonadoPluginLib', dirs: 'lib'
+        String basePath = pluginDirPath? "${pluginDirPath}/" : ''
+        flatDir name: "carbonadoLibDir", dirs: ["${basePath}lib"]
     }
     dependencies {
         compile('commons-dbcp:commons-dbcp:1.4',
                 'commons-pool:commons-pool:1.5.6',
-                'com.h2database:h2:1.3.158',
+                'com.h2database:h2:1.3.164',
                 'joda-time:joda-time:1.6.2') {
             transitive = false
         }
-        compile 'com.sleepycat:berkeleydb-je:4.1.10',
-                'com.amazon:carbonado:1.2.2',
-                'com.amazon:carbonado-sleepycat-db:1.2.2',
-                'com.amazon:carbonado-sleepycat-je:1.2.2',
+        String carbonadoVersion = '1.2.2'
+        compile 'com.sleepycat:berkeleydb-je:5.0.34',
+                "com.amazon:carbonado:$carbonadoVersion",
+                "com.amazon:carbonado-sleepycat-db:$carbonadoVersion",
+                "com.amazon:carbonado-sleepycat-je:$carbonadoVersion",
                 'org.cojen:cojen:2.2.2'
     }
 }
@@ -31,4 +31,16 @@ griffon {
     }
 }
 
-griffon.jars.destDir='target/addon'
+log4j = {
+    // Example of changing the log pattern for the default console
+    // appender:
+    appenders {
+        console name: 'stdout', layout: pattern(conversionPattern: '%d [%t] %-5p %c - %m%n')
+    }
+
+    error 'org.codehaus.griffon',
+          'org.springframework',
+          'org.apache.karaf',
+          'groovyx.net'
+    warn  'griffon'
+}
