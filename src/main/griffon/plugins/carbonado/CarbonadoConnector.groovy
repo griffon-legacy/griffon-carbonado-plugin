@@ -19,6 +19,7 @@ import griffon.core.GriffonApplication
 import griffon.util.Environment
 import griffon.util.Metadata
 import griffon.util.CallableWithArgs
+import griffon.util.ConfigUtils
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -60,8 +61,7 @@ final class CarbonadoConnector implements CarbonadoProvider {
     // ======================================================
 
     ConfigObject createConfig(GriffonApplication app) {
-        def repositoryClass = app.class.classLoader.loadClass('CarbonadoConfig')
-        new ConfigSlurper(Environment.current.name).parse(repositoryClass)
+        ConfigUtils.loadConfigWithI18n('CarbonadoConfig')
     }
 
     private ConfigObject narrowConfig(ConfigObject config, String repositoryName) {
@@ -106,7 +106,7 @@ final class CarbonadoConnector implements CarbonadoProvider {
         return createMapRepository(config.map, repositoryName)
     }
 
-    private Repository createJDBCRepository(ConfigObject config, String repositoryName) {   
+    private Repository createJDBCRepository(ConfigObject config, String repositoryName) {
         DataSource dataSource = createDataSource(config)
         def skipSchema = config.schema?.skip ?: false
         if (!skipSchema) createSchema(config, repositoryName, dataSource)
@@ -117,7 +117,7 @@ final class CarbonadoConnector implements CarbonadoProvider {
         builder.build()
     }
 
-    private Repository createBDBRepository(ConfigObject config, String repositoryName) {   
+    private Repository createBDBRepository(ConfigObject config, String repositoryName) {
         BDBRepositoryBuilder builder = new BDBRepositoryBuilder()
         builder.name = repositoryName
         config.each { propName, propValue ->
@@ -126,7 +126,7 @@ final class CarbonadoConnector implements CarbonadoProvider {
         builder.build()
     }
 
-    private Repository createMapRepository(ConfigObject config, String repositoryName) {   
+    private Repository createMapRepository(ConfigObject config, String repositoryName) {
         MapRepositoryBuilder builder = new MapRepositoryBuilder()
         builder.name = repositoryName
         config.each { propName, propValue ->

@@ -9,17 +9,17 @@ griffon.project.dependency.resolution = {
     }
     dependencies {
         compile('commons-dbcp:commons-dbcp:1.4',
-                'commons-pool:commons-pool:1.5.6',
-                'com.h2database:h2:1.3.164',
-                'joda-time:joda-time:1.6.2') {
+                'commons-pool:commons-pool:1.6',
+                'com.h2database:h2:1.3.168',
+                'joda-time:joda-time:2.1') {
             transitive = false
         }
-        String carbonadoVersion = '1.2.2'
-        compile 'com.sleepycat:berkeleydb-je:5.0.34',
+        String carbonadoVersion = '1.2.3'
+        compile 'com.sleepycat:berkeleydb-je:5.0.58',
                 "com.amazon:carbonado:$carbonadoVersion",
                 "com.amazon:carbonado-sleepycat-db:$carbonadoVersion",
                 "com.amazon:carbonado-sleepycat-je:$carbonadoVersion",
-                'org.cojen:cojen:2.2.2'
+                'org.cojen:cojen:2.2.3'
     }
 }
 

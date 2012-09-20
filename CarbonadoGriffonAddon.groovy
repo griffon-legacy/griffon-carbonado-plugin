@@ -37,7 +37,7 @@ class CarbonadoGriffonAddon {
         }
     }
 
-    def events = [
+    Map events = [
         ShutdownStart: { app ->
             ConfigObject config = CarbonadoConnector.instance.createConfig(app)
             CarbonadoConnector.instance.disconnect(app, config)

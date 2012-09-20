@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 the original author or authors.
+ * Copyright 2011-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,15 +12,15 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  */
- 
+
 /**
  * @author Andres Almiray
  */
 class CarbonadoGriffonPlugin {
     // the plugin version
-    String version = '0.4'
+    String version = '0.5'
     // the version or versions of Griffon the plugin is designed for
-    String griffonVersion = '0.9.5 > *'
+    String griffonVersion = '1.1.0 > *'
     // the other plugins this plugin depends on
     Map dependsOn = [:]
     // resources that are included in plugin packaging
@@ -62,19 +62,20 @@ giving you access to a `com.amazon.carbonado.Repository` object, with which you'
 to make calls to the repository. Remember to make all repository calls off the EDT
 otherwise your application may appear unresponsive when doing long computations
 inside the EDT.
+
 This method is aware of multiple repositories. If no repositoryName is specified when calling
 it then the default repository will be selected. Here are two example usages, the first
 queries against the default repository while the second queries a repository whose name has
 been configured as 'internal'
 
-	package sample
-	class SampleController {
-	    def queryAllRepisitories = {
-	        withCarbonado { repositoryName, repository -> ... }
-	        withCarbonado('internal') { repositoryName, repository -> ... }
-	    }
-	}
-	
+    package sample
+    class SampleController {
+        def queryAllRepisitories = {
+            withCarbonado { repositoryName, repository -> ... }
+            withCarbonado('internal') { repositoryName, repository -> ... }
+        }
+    }
+
 This method is also accessible to any component through the singleton `griffon.plugins.carbonado.CarbonadoConnector`.
 You can inject these methods to non-artifacts via metaclasses. Simply grab hold of a particular metaclass and call
 `CarbonadoEnhancer.enhance(metaClassInstance, carbonadoProviderInstance)`.
@@ -111,11 +112,11 @@ implies this is the repository used by default, however you can configure named 
 by adding a new config block. For example connecting to a repository whose name is 'internal'
 can be done in this way
 
-	repositories {
-	    internal {
-		    type = 'map'
-		}
-	}
+    repositories {
+        internal {
+            type = 'map'
+        }
+    }
 
 This block can be used inside the `environments()` block in the same way as the
 default repository block is used.
@@ -142,9 +143,9 @@ fails regardless of the arguments it receives
 
     class MyCarbonadoProvider implements CarbonadoProvider {
         Object withCarbonado(String repositoryName = 'default', Closure closure) { null }
-        public <T> T withCarbonado(String repositoryName = 'default', CallableWithArgs<T> callable) { null }      
+        public <T> T withCarbonado(String repositoryName = 'default', CallableWithArgs<T> callable) { null }
     }
-    
+
 This implementation may be used in the following way
 
     class MyServiceTests extends GriffonUnitTestCase {

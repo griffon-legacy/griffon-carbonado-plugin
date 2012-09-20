@@ -34,7 +34,7 @@ class RepositoryHolder implements CarbonadoProvider {
     private static final Logger LOG = LoggerFactory.getLogger(RepositoryHolder)
     private static final Object[] LOCK = new Object[0]
     private final Map<String, Repository> repositories = [:]
-  
+
     String[] getRepositoryNames() {
         List<String> repositoryNames = new ArrayList().addAll(repositories.keySet())
         repositoryNames.toArray(new String[repositoryNames.size()])
@@ -47,7 +47,7 @@ class RepositoryHolder implements CarbonadoProvider {
 
     void setRepository(String repositoryName = 'default', Repository repository) {
         if(isBlank(repositoryName)) repositoryName = 'default'
-        storeRepository(repositoryName, repository)       
+        storeRepository(repositoryName, repository)
     }
 
     Object withCarbonado(String repositoryName = 'default', Closure closure) {
@@ -81,7 +81,7 @@ class RepositoryHolder implements CarbonadoProvider {
             ConfigObject config = CarbonadoConnector.instance.createConfig(app)
             repository = CarbonadoConnector.instance.connect(app, config, repositoryName)
         }
-        
+
         if(repository == null) {
             throw new IllegalArgumentException("No such carbonado repository configuration for name $repositoryName")
         }
