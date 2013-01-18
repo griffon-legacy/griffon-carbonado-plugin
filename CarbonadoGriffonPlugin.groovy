@@ -83,8 +83,8 @@ The following list enumerates all the variants of the injected method
 
  * `<R> R withCarbonado(Closure<R> stmts)`
  * `<R> R withCarbonado(CallableWithArgs<R> stmts)`
- * `<R> R withCarbonado(String carbonadoServerName, Closure<R> stmts)`
- * `<R> R withCarbonado(String carbonadoServerName, CallableWithArgs<R> stmts)`
+ * `<R> R withCarbonado(String repositoryName, Closure<R> stmts)`
+ * `<R> R withCarbonado(String repositoryName, CallableWithArgs<R> stmts)`
 
 These methods are also accessible to any component through the singleton
 `griffon.plugins.carbonado.CarbonadoConnector`. You can inject these methods to
