@@ -22,7 +22,11 @@ import groovy.lang.Closure;
 /**
  * @author Andres Almiray
  */
-public interface CarbonadoProvider {
+public interface CarbonadoContributionHandler {
+    void setCarbonadoProvider(CarbonadoProvider provider);
+
+    CarbonadoProvider getCarbonadoProvider();
+
     <R> R withCarbonado(Closure<R> closure);
 
     <R> R withCarbonado(String repositoryName, Closure<R> closure);

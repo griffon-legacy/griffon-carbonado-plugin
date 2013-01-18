@@ -16,18 +16,24 @@
 
 package griffon.plugins.carbonado;
 
-import griffon.util.CallableWithArgs;
-import groovy.lang.Closure;
+import com.amazon.carbonado.Repository;
 
 /**
  * @author Andres Almiray
  */
-public interface CarbonadoProvider {
-    <R> R withCarbonado(Closure<R> closure);
+public class DefaultCarbonadoProvider extends AbstractCarbonadoProvider {
+    private static final DefaultCarbonadoProvider INSTANCE;
 
-    <R> R withCarbonado(String repositoryName, Closure<R> closure);
+    static {
+        INSTANCE = new DefaultCarbonadoProvider();
+    }
 
-    <R> R withCarbonado(CallableWithArgs<R> callable);
+    public static DefaultCarbonadoProvider getInstance() {
+        return INSTANCE;
+    }
 
-    <R> R withCarbonado(String repositoryName, CallableWithArgs<R> callable);
+    @Override
+    protected Repository getRepository(String repositoryName) {
+        return RepositoryHolder.getInstance().fetchRepository(repositoryName);
+    }
 }

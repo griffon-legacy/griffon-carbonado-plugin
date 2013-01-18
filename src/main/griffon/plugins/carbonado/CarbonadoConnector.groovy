@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 the original author or authors.
+ * Copyright 2011-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package griffon.plugins.carbonado
 import griffon.core.GriffonApplication
 import griffon.util.Environment
 import griffon.util.Metadata
-import griffon.util.CallableWithArgs
 import griffon.util.ConfigUtils
 
 import org.slf4j.Logger
@@ -45,30 +44,23 @@ import com.amazon.carbonado.repo.sleepycat.BDBRepositoryBuilder
  * @author Andres Almiray
  */
 @Singleton
-final class CarbonadoConnector implements CarbonadoProvider {
+final class CarbonadoConnector {
+    private static final String DEFAULT = 'default'
+    private static final Logger LOG = LoggerFactory.getLogger(CarbonadoConnector)
     private bootstrap
 
-    private static final Logger LOG = LoggerFactory.getLogger(CarbonadoConnector)
-
-    Object withCarbonado(String repositoryName = 'default', Closure closure) {
-        RepositoryHolder.instance.withCarbonado(repositoryName, closure)
-    }
-
-    public <T> T withCarbonado(String repositoryName = 'default', CallableWithArgs<T> callable) {
-        return RepositoryHolder.instance.withCarbonado(repositoryName, callable)
-    }
-
-    // ======================================================
-
     ConfigObject createConfig(GriffonApplication app) {
-        ConfigUtils.loadConfigWithI18n('CarbonadoConfig')
+        if (!app.config.pluginConfig.carbonado) {
+            app.config.pluginConfig.carbonado = ConfigUtils.loadConfigWithI18n('CarbonadoConfig')
+        }
+        app.config.pluginConfig.carbonado
     }
 
     private ConfigObject narrowConfig(ConfigObject config, String repositoryName) {
-        return repositoryName == 'default' ? config.repository : config.repositories[repositoryName]
+        return repositoryName == DEFAULT ? config.repository : config.repositories[repositoryName]
     }
 
-    Repository connect(GriffonApplication app, ConfigObject config, String repositoryName = 'default') {
+    Repository connect(GriffonApplication app, ConfigObject config, String repositoryName = DEFAULT) {
         if (RepositoryHolder.instance.isRepositoryConnected(repositoryName)) {
             return RepositoryHolder.instance.getRepository(repositoryName)
         }
@@ -79,21 +71,33 @@ final class CarbonadoConnector implements CarbonadoProvider {
         RepositoryHolder.instance.setRepository(repositoryName, repository)
         bootstrap = app.class.classLoader.loadClass('BootstrapCarbonado').newInstance()
         bootstrap.metaClass.app = app
-        bootstrap.init(repositoryName, repository)
+        resolveCarbonadoProvider(app).withCarbonado { rn, r -> bootstrap.init(rn, r) }
         app.event('CarbonadoConnectEnd', [repositoryName, repository])
         repository
     }
 
-    void disconnect(GriffonApplication app, ConfigObject config, String repositoryName = 'default') {
+    void disconnect(GriffonApplication app, ConfigObject config, String repositoryName = DEFAULT) {
         if (RepositoryHolder.instance.isRepositoryConnected(repositoryName)) {
             config = narrowConfig(config, repositoryName)
             Repository repository = RepositoryHolder.instance.getRepository(repositoryName)
             app.event('CarbonadoDisconnectStart', [config, repositoryName, repository])
-            bootstrap.destroy(repositoryName, repository)
+            resolveCarbonadoProvider(app).withCarbonado { rn, r -> bootstrap.destroy(rn, r) }
             stopCarbonado(config, repositoryName, repository)
             app.event('CarbonadoDisconnectEnd', [config, repositoryName])
             RepositoryHolder.instance.disconnectRepository(repositoryName)
         }
+    }
+
+    CarbonadoProvider resolveCarbonadoProvider(GriffonApplication app) {
+        def carbonadoProvider = app.config.carbonadoProvider
+        if (carbonadoProvider instanceof Class) {
+            carbonadoProvider = carbonadoProvider.newInstance()
+            app.config.carbonadoProvider = carbonadoProvider
+        } else if (!carbonadoProvider) {
+            carbonadoProvider = DefaultCarbonadoProvider.instance
+            app.config.carbonadoProvider = carbonadoProvider
+        }
+        carbonadoProvider
     }
 
     private Repository startCarbonado(ConfigObject config, String repositoryName) {

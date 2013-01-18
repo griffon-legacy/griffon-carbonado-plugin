@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 the original author or authors.
+ * Copyright 2012-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package griffon.plugins.carbonado
 
 import griffon.util.CallableWithArgs
@@ -23,20 +24,21 @@ import org.slf4j.LoggerFactory
  * @author Andres Almiray
  */
 final class CarbonadoEnhancer {
+    private static final String DEFAULT = 'default'
     private static final Logger LOG = LoggerFactory.getLogger(CarbonadoEnhancer)
 
     private CarbonadoEnhancer() {}
-
-    static void enhance(MetaClass mc, CarbonadoProvider provider = RepositoryHolder.instance) {
+    
+    static void enhance(MetaClass mc, CarbonadoProvider provider = DefaultCarbonadoProvider.instance) {
         if(LOG.debugEnabled) LOG.debug("Enhancing $mc with $provider")
         mc.withCarbonado = {Closure closure ->
-            provider.withCarbonado('default', closure)
+            provider.withCarbonado(DEFAULT, closure)
         }
         mc.withCarbonado << {String repositoryName, Closure closure ->
             provider.withCarbonado(repositoryName, closure)
         }
         mc.withCarbonado << {CallableWithArgs callable ->
-            provider.withCarbonado('default', callable)
+            provider.withCarbonado(DEFAULT, callable)
         }
         mc.withCarbonado << {String repositoryName, CallableWithArgs callable ->
             provider.withCarbonado(repositoryName, callable)

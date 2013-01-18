@@ -14,20 +14,13 @@
  * limitations under the License.
  */
 
-package griffon.plugins.carbonado;
-
-import griffon.util.CallableWithArgs;
-import groovy.lang.Closure;
+package dsld
 
 /**
  * @author Andres Almiray
  */
-public interface CarbonadoProvider {
-    <R> R withCarbonado(Closure<R> closure);
 
-    <R> R withCarbonado(String repositoryName, Closure<R> closure);
-
-    <R> R withCarbonado(CallableWithArgs<R> callable);
-
-    <R> R withCarbonado(String repositoryName, CallableWithArgs<R> callable);
+contribute(enclosingClass(annotatedBy('griffon.plugins.carbonado.CarbonadoAware'))) {
+    provider = "Carbonado DSL"
+    delegatesTo "griffon.plugins.carbonado.CarbonadoContributionHandler"
 }

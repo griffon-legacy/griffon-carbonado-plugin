@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 the original author or authors.
+ * Copyright 2011-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,20 +18,19 @@ import griffon.core.GriffonClass
 import griffon.core.GriffonApplication
 import griffon.plugins.carbonado.CarbonadoConnector
 import griffon.plugins.carbonado.CarbonadoEnhancer
+import griffon.plugins.carbonado.CarbonadoContributionHandler
 
 /**
  * @author Andres Almiray
  */
 class CarbonadoGriffonAddon {
-    void addonInit(GriffonApplication app) {
+    void addonPostInit(GriffonApplication app) {
         ConfigObject config = CarbonadoConnector.instance.createConfig(app)
         CarbonadoConnector.instance.connect(app, config)
-    }
-
-    void addonPostInit(GriffonApplication app) {
         def types = app.config.griffon?.carbonado?.injectInto ?: ['controller']
         for(String type : types) {
             for(GriffonClass gc : app.artifactManager.getClassesOfType(type)) {
+                if (CarbonadoContributionHandler.isAssignableFrom(gc.clazz)) continue
                 CarbonadoEnhancer.enhance(gc.metaClass)
             }
         }
