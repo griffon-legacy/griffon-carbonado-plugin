@@ -20,13 +20,17 @@ import griffon.plugins.carbonado.CarbonadoConnector
 import griffon.plugins.carbonado.CarbonadoEnhancer
 import griffon.plugins.carbonado.CarbonadoContributionHandler
 
+import static griffon.util.ConfigUtils.getConfigValueAsBoolean
+
 /**
  * @author Andres Almiray
  */
 class CarbonadoGriffonAddon {
     void addonPostInit(GriffonApplication app) {
         ConfigObject config = CarbonadoConnector.instance.createConfig(app)
-        CarbonadoConnector.instance.connect(app, config)
+        if (getConfigValueAsBoolean(app.config, 'griffon.carbonado.connect.onstartup', true)) {
+            CarbonadoConnector.instance.connect(app, config)
+        }
         def types = app.config.griffon?.carbonado?.injectInto ?: ['controller']
         for(String type : types) {
             for(GriffonClass gc : app.artifactManager.getClassesOfType(type)) {

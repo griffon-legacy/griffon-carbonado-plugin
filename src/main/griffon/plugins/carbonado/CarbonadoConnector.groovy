@@ -57,7 +57,12 @@ final class CarbonadoConnector {
     }
 
     private ConfigObject narrowConfig(ConfigObject config, String repositoryName) {
-        return repositoryName == DEFAULT ? config.repository : config.repositories[repositoryName]
+        if (config.containsKey('repository') && repositoryName == DEFAULT) {
+            return config.repository
+        } else if (config.containsKey('repositories')) {
+            return config.repositories[repositoryName]
+        }
+        return config
     }
 
     Repository connect(GriffonApplication app, ConfigObject config, String repositoryName = DEFAULT) {
@@ -191,7 +196,7 @@ final class CarbonadoConnector {
                 break
             }
         }
-        if(!ddl) {
+        if (!ddl) {
             LOG.error("DataSource[${repositoryName}].dbCreate was set to 'create' but no suitable schema was found in classpath.")
             return
         }
@@ -230,7 +235,7 @@ final class CarbonadoConnector {
         Connection connection = null
         try {
             connection = repository.dataSource.getConnection()
-            if(connection.metaData.databaseProductName == 'HSQL Database Engine') {
+            if (connection.metaData.databaseProductName == 'HSQL Database Engine') {
                 connection.createStatement().executeUpdate('SHUTDOWN')
             }
         } finally {

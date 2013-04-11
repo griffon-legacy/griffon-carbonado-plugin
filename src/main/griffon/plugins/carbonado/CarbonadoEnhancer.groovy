@@ -30,7 +30,7 @@ final class CarbonadoEnhancer {
     private CarbonadoEnhancer() {}
     
     static void enhance(MetaClass mc, CarbonadoProvider provider = DefaultCarbonadoProvider.instance) {
-        if(LOG.debugEnabled) LOG.debug("Enhancing $mc with $provider")
+        if (LOG.debugEnabled) LOG.debug("Enhancing $mc with $provider")
         mc.withCarbonado = {Closure closure ->
             provider.withCarbonado(DEFAULT, closure)
         }

@@ -46,35 +46,35 @@ class RepositoryHolder {
     }
 
     Repository getRepository(String repositoryName = DEFAULT) {
-        if(isBlank(repositoryName)) repositoryName = DEFAULT
+        if (isBlank(repositoryName)) repositoryName = DEFAULT
         retrieveRepository(repositoryName)
     }
 
     void setRepository(String repositoryName = DEFAULT, Repository repository) {
-        if(isBlank(repositoryName)) repositoryName = DEFAULT
+        if (isBlank(repositoryName)) repositoryName = DEFAULT
         storeRepository(repositoryName, repository)
     }
 
     boolean isRepositoryConnected(String repositoryName) {
-        if(isBlank(repositoryName)) repositoryName = DEFAULT
+        if (isBlank(repositoryName)) repositoryName = DEFAULT
         retrieveRepository(repositoryName) != null
     }
     
     void disconnectRepository(String repositoryName) {
-        if(isBlank(repositoryName)) repositoryName = DEFAULT
+        if (isBlank(repositoryName)) repositoryName = DEFAULT
         storeRepository(repositoryName, null)
     }
 
     Repository fetchRepository(String repositoryName) {
-        if(isBlank(repositoryName)) repositoryName = DEFAULT
+        if (isBlank(repositoryName)) repositoryName = DEFAULT
         Repository repository = retrieveRepository(repositoryName)
-        if(repository == null) {
+        if (repository == null) {
             GriffonApplication app = ApplicationHolder.application
             ConfigObject config = CarbonadoConnector.instance.createConfig(app)
             repository = CarbonadoConnector.instance.connect(app, config, repositoryName)
         }
 
-        if(repository == null) {
+        if (repository == null) {
             throw new IllegalArgumentException("No such carbonado repository configuration for name $repositoryName")
         }
         repository
