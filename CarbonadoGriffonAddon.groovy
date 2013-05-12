@@ -27,10 +27,7 @@ import static griffon.util.ConfigUtils.getConfigValueAsBoolean
  */
 class CarbonadoGriffonAddon {
     void addonPostInit(GriffonApplication app) {
-        ConfigObject config = CarbonadoConnector.instance.createConfig(app)
-        if (getConfigValueAsBoolean(app.config, 'griffon.carbonado.connect.onstartup', true)) {
-            CarbonadoConnector.instance.connect(app, config)
-        }
+        CarbonadoConnector.instance.createConfig(app)
         def types = app.config.griffon?.carbonado?.injectInto ?: ['controller']
         for(String type : types) {
             for(GriffonClass gc : app.artifactManager.getClassesOfType(type)) {
@@ -41,6 +38,12 @@ class CarbonadoGriffonAddon {
     }
 
     Map events = [
+        LoadAddonsEnd: { app, addons ->
+            if (getConfigValueAsBoolean(app.config, 'griffon.carbonado.connect.onstartup', true)) {
+                ConfigObject config = CarbonadoConnector.instance.createConfig(app)
+                CarbonadoConnector.instance.connect(app, config)
+            }
+        },
         ShutdownStart: { app ->
             ConfigObject config = CarbonadoConnector.instance.createConfig(app)
             CarbonadoConnector.instance.disconnect(app, config)

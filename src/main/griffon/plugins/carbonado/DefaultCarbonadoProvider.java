@@ -32,6 +32,8 @@ public class DefaultCarbonadoProvider extends AbstractCarbonadoProvider {
         return INSTANCE;
     }
 
+    private DefaultCarbonadoProvider() {}
+
     @Override
     protected Repository getRepository(String repositoryName) {
         return RepositoryHolder.getInstance().fetchRepository(repositoryName);
